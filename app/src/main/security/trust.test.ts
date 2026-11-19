@@ -13,6 +13,13 @@ describe('createUrlTrust (production)', () => {
     expect(isTrusted('file:///D:/apps/tluely/out/renderer/index.html')).toBe(true)
   })
 
+  // Overlay windows load index.html?window=<kind> (D-034); the query must not break trust.
+  it('trusts our page with a ?window= query', () => {
+    expect(isTrusted('file:///D:/apps/tluely/out/renderer/index.html?window=control-bar')).toBe(
+      true
+    )
+  })
+
   // Windows paths ignore case, so a different drive-letter case is still our page.
   it('ignores path case on Windows', () => {
     expect(isTrusted('file:///d:/apps/tluely/out/renderer/index.html')).toBe(true)

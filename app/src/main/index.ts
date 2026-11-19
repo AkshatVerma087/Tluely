@@ -45,13 +45,23 @@ app.whenReady().then(() => {
     // Toggles invisible mode. The store notifies subscribers, so windows get 'state:changed'.
     'invisible:set': (invisible) => {
       store.update((s) => (s.invisible === invisible ? s : { ...s, invisible }))
-    }
+    },
+    // The answer panel reports its content height; the window service clamps and applies it.
+    'window:resizePanel': (contentHeight) => windows.resizeAnswerPanel(contentHeight),
+    // Quit the app (control bar button now, tray menu in Phase 1.4).
+    // Overlays are closable:false, so quitting goes through app.quit(), not by closing windows.
+    'app:quit': () => app.quit()
   })
 
-  // 4. Show the UI.
-  windows.openMainWindow()
+  // 4. Show the UI: the overlays (control bar + answer panel below it).
+  windows.openControlBar()
+  windows.openAnswerPanel()
 
-  // Clean up subscriptions and handlers when the app is quitting.
+  // Quitting: destroy the overlays first. They are closable:false, so app.quit()'s attempt to
+  // close them would be refused and cancel the quit (found in the 1.1 click test).
+  app.on('before-quit', () => windows.destroyOverlays())
+
+  // Clean up subscriptions and handlers once the app is really quitting.
   app.on('will-quit', () => {
     disposeCommands()
     windows.dispose()

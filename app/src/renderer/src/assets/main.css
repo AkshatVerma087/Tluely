@@ -1,3 +1,5 @@
+/* Global styles shared by every window. */
+
 *,
 *::before,
 *::after {
@@ -19,44 +21,134 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-.app {
-  height: 100%;
-  display: grid;
-  place-items: center;
-}
-
-/* Temporary IPC self-check (Phase 0.4); removed with the Phase 1 UI. */
-.ipc-check {
-  display: grid;
-  gap: 12px;
-}
-
-.ipc-check ul {
-  list-style: none;
-  padding: 0;
-  display: grid;
-  gap: 6px;
-}
-
-.ipc-check .passed {
-  color: #6fd38a;
-}
-
-.ipc-check .failed {
+/* Shown by Root.tsx when the page has no valid ?window= kind. */
+.route-error {
+  padding: 16px;
   color: #ff6b6b;
 }
 
-.ipc-check small {
+/* Overlay pages (class set in main.tsx) draw on a transparent window; only their elements show. */
+html.overlay,
+html.overlay body {
+  background: transparent;
+}
+
+/* The answer panel scrolls once its window reaches the 500 px maximum. */
+html.overlay body {
+  overflow-y: auto;
+}
+
+/* Control bar (Phase 1.1): pill filling its 200x50 window.
+   Columns: status (takes the free space) | invisible toggle | quit. */
+.control-bar {
+  height: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px 0 16px;
+  border-radius: 999px;
+  background: rgba(27, 27, 31, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  user-select: none; /* clicking shouldn't select text */
+}
+
+.control-bar .status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Status dot colours by tone (see control-bar/status.ts). */
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+.dot-idle {
+  background: #8a8a93;
+}
+.dot-busy {
+  background: #e0b04c;
+}
+.dot-live {
+  background: #4fc97a;
+}
+.dot-answering {
+  background: #5aa7ff;
+}
+
+/* Round icon buttons (eye toggle, quit). */
+.icon-button {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #c9c9d1;
+  cursor: pointer;
+}
+.icon-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+/* "On" state, e.g. invisible mode enabled. */
+.icon-button.active {
+  color: #5aa7ff;
+}
+.icon-button svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Answer panel (Phase 1.1). Natural height, so its measured size drives the window height. */
+.answer-panel {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: rgba(27, 27, 31, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  line-height: 1.45;
+}
+
+.answer-panel h2 {
+  font-size: 13px;
+  font-weight: 600;
+  color: #9a9aa2;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* Hotkey hints under the placeholder text. */
+.answer-panel .hints {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  font-size: 12px;
   color: #9a9aa2;
 }
 
-.ipc-check button {
-  justify-self: start;
-  padding: 6px 12px;
-  border: 1px solid #3a3a42;
-  border-radius: 6px;
-  background: #26262c;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
+kbd {
+  padding: 1px 5px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  font-family: inherit;
+  font-size: 11px;
+  color: #d6d6dd;
 }

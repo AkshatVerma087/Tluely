@@ -45,18 +45,22 @@ All code paths (`src/...`) are inside `app/`, and npm commands run in `app/` (D-
 ## Phase 1: Stealth overlay and hotkeys
 
 ### 1.1 Overlay windows
-- [ ] `windows/factory.ts`: `createOverlayWindow(kind)` with shared options (D-025)
-- [ ] Control bar window (~200×50, top-centre of the primary screen)
-- [ ] Answer panel window (~540×140–500, below the bar, grows with content)
-- [ ] Renderer routes/entries for control-bar and answer-panel (remove the temporary IPC self-check from `App.tsx`)
-- [ ] Minimal UI: bar shows status + invisible toggle; panel shows placeholder text
-- [ ] ✅ Both windows appear transparent, frameless, on top, not in the taskbar or Alt+Tab
+- [x] `windows/factory.ts`: `createOverlayWindow(kind)` with shared options (D-025). Pure `overlay-options.ts` + Electron `factory.ts`; pages load with `?window=<kind>` (D-034, Proposed). Verified 2026-11-19: `npm run check` passes (26 tests, 7 new). Not yet run in the app; the first real use is the control bar window, next
+- [x] Control bar window (~200×50, top-centre of the primary screen). Built by the factory, single instance, shown with `showInactive`, positioned by the pure `layout.ts#topCenter` on the primary work area (3 unit tests). Verified 2026-11-19 with `scripts/windows.ps1`: `rect=860,12 200x50`, `centerOffsetX=0`, `topmost=True` on a 1920×1032 work area. Taskbar: user confirmed one icon only (the temporary window). Alt+Tab: excluded, because `focusable:false` gives `WS_EX_NOACTIVATE` (`windows.ps1` → `altTab=False`)
+- [x] Answer panel window (~540×140–500, below the bar, grows with content). **Create it with `parent: controlBar`** (owned window): it is focusable, so `skipTaskbar` alone would leave it in Alt+Tab. Done: positioned by `layout.ts#below` (8 px gap, clamped to the work area); `useReportHeight` (ResizeObserver) → `window:resizePanel` IPC → `clampOverlayHeight` (140–500). Verified 2026-11-19: `rect=690,70 540x167` (grew past 140 to fit the placeholder), `owned=True`, screenshot shows it under the bar
+- [x] `windows.ps1` reports `altTab=False` for every overlay window. Verified 2026-11-19: control bar `altTab=False (noactivate)`, answer panel `altTab=False (owned)`
+- [x] Renderer routes/entries for control-bar and answer-panel (remove the temporary IPC self-check from `App.tsx`). Done: `shared/windows.ts` (`WindowKind`, `windowKindFromSearch`; 6 tests), `routes.tsx` (typed `Record<WindowKind, lazy>`, one code chunk per window), `Root.tsx` (Suspense + error for unknown kind). Removed `App.tsx`, the temporary main window and its CSS; added the `app:quit` command. Verified 2026-11-19: `npm run check` passes (45 tests), the build emits separate chunks per window, both overlays render (screenshot), the panel resizes via IPC (`540x167`), and the log is clean. Note: until the tray exists (1.4), quit with Ctrl+C in the `npm run dev` terminal
+- [x] Minimal UI: bar shows status + invisible toggle; panel shows placeholder text. Done: `hooks/useAppState` (`state:get` + `state:changed`), control bar = status dot/label (`control-bar/status.ts`, 6 tests) + eye toggle + quit; panel = placeholder text + hotkey hints. Fixed: quit was refused because overlays are `closable:false`, so they are now destroyed on `before-quit`. Verified 2026-11-20 with a simulated-click test: the eye click flipped the icon (invisible → visible via IPC round trip, without focus), the ✕ click left 0 processes, the log is clean, and screenshots look right
+- [x] ✅ Both windows appear transparent, frameless, on top, not in the taskbar or Alt+Tab. Verified 2026-11-20 on the current build:
+  - `windows.ps1`: both overlays `frameless=True topmost=True altTab=False`.
+  - Taskbar via UI Automation: 21 buttons scanned, no tluely/Electron button. Positive control: a plain Electron window WAS detected ("Electron - 1 running window"), so the scan works.
+  - Transparency: pixels outside the rounded shapes are identical to the baseline screenshot (bar corner, panel corner); pixels inside the shapes changed.
 
 ### 1.2 Stealth
 - [ ] `stealth/`: apply `setContentProtection(state.isInvisible || state.isCapturing)` on every state change
 - [ ] Opacity-0 → show → opacity-1 after 30 ms show trick
 - [ ] Optional "don't take focus" setting (`focusable: false`, re-apply `skipTaskbar`)
-- [ ] Copy `analysis/scripts/affinity.ps1` → `scripts/affinity.ps1` targeting tluely
+- [x] Copy `analysis/scripts/affinity.ps1` → `app/scripts/windows.ps1` targeting tluely (also reports work area, centre offset, topmost and toolwindow flags). Done 2026-11-19 during 1.1
 - [ ] ✅ affinity.ps1 reports `WDA_EXCLUDEFROMCAPTURE` (0x11) when invisible is on, `WDA_NONE` when off
 - [ ] ✅ Google Meet screen share: overlay not visible on the other side
 

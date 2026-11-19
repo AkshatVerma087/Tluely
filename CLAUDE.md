@@ -31,5 +31,12 @@ Use it instead of re-analyzing Cluely.
 - All IPC goes through the typed contract in `src/shared/ipc.ts` (D-021).
 - Never commit `analysis/cluely-src/`, which is Cluely's proprietary code (D-003).
 
+- Inspect real windows with `powershell -ExecutionPolicy Bypass -File app/scripts/windows.ps1` while the app runs
+  (position, size, capture affinity, topmost).
+- When the app is launched in the background from this shell, the first normal `show()` window can start minimized
+  (Windows applies the launcher's show mode). For visual checks, launch Electron directly:
+  `Start-Process .\node_modules\electron\dist\electron.exe -ArgumentList . -WindowStyle Normal` (in `app/`,
+  with `ELECTRON_RUN_AS_NODE` cleared, after `npx electron-vite build`).
+
 ## Working with the user
 - The user is new to desktop app architecture, so explain new concepts briefly when introducing them.

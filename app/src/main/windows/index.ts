@@ -1,51 +1,124 @@
 // Window service: creates the app's windows and keeps them in sync with the AppState.
 //
-// For now it creates one temporary window. Phase 1.1 replaces it with the overlay
-// windows (control bar, answer panel) made by a shared factory (D-025).
+// - Overlay windows (control bar, answer panel) come from the shared factory (D-025).
+// - The answer panel is owned by the control bar (parent), which keeps it out of Alt+Tab.
+// - Every state change is pushed to all windows as 'state:changed' (D-022).
+// - The Settings window (a normal window) is added in Phase 1.4.
 
-import { BrowserWindow } from 'electron'
-import { join } from 'path'
-import { is } from '@electron-toolkit/utils'
+import { BrowserWindow, screen } from 'electron'
 import type { StateStore } from '../store'
 import { broadcast } from '../ipc'
-import { secureWebPreferences } from '../security'
+import { createOverlayWindow } from './factory'
+import { OVERLAY_SPECS, clampOverlayHeight } from './overlay-options'
+import { below, topCenter } from './layout'
 
 export interface WindowServiceDeps {
   store: StateStore
 }
 
 export interface WindowService {
-  /** Creates and shows the temporary main window. */
-  openMainWindow(): BrowserWindow
+  /** Creates the control bar (once) at the top centre of the primary screen and shows it. */
+  openControlBar(): BrowserWindow
+  /** Creates the answer panel (once) below the control bar, owned by it, and shows it. */
+  openAnswerPanel(): BrowserWindow
+  /** Resizes the answer panel to fit content of the given height (clamped 140-500 px). */
+  resizeAnswerPanel(contentHeight: number): void
+  /**
+   * Destroys the overlay windows. Called when the app quits: overlays are closable:false, so
+   * app.quit()'s normal "close every window" step is refused and would cancel the quit.
+   * destroy() bypasses that.
+   */
+  destroyOverlays(): void
   /** Stops pushing state to windows (called on shutdown). */
   dispose(): void
+}
+
+/** True if the window exists and hasn't been destroyed. */
+function isAlive(window: BrowserWindow | null): window is BrowserWindow {
+  return window !== null && !window.isDestroyed()
 }
 
 export function createWindowService({ store }: WindowServiceDeps): WindowService {
   // Push every state change to all windows as 'state:changed' (D-022).
   const unsubscribe = store.subscribe((next) => broadcast('state:changed', next))
 
-  function openMainWindow(): BrowserWindow {
-    const window = new BrowserWindow({
-      width: 900,
-      height: 670,
-      show: false, // shown on 'ready-to-show' to avoid a blank white flash
-      autoHideMenuBar: true,
-      // Sandboxed, isolated, no Node.js (D-011). Link and navigation rules are app-wide in security/.
-      webPreferences: secureWebPreferences()
+  // At most one of each overlay; null when not created (or destroyed).
+  let controlBar: BrowserWindow | null = null
+  let answerPanel: BrowserWindow | null = null
+
+  /** "Don't take focus" applies only while invisible (FINDINGS.md section 4). */
+  function preventFocus(): boolean {
+    const { invisible, settings } = store.get()
+    return invisible && settings.noFocusWhenInvisible
+  }
+
+  function openControlBar(): BrowserWindow {
+    // Only one control bar may exist; reuse it if it's still alive.
+    if (isAlive(controlBar)) return controlBar
+
+    const window = createOverlayWindow('control-bar', { preventFocus: preventFocus() })
+
+    // Top centre of the primary screen's work area (the screen minus the taskbar).
+    const { workArea } = screen.getPrimaryDisplay()
+    const { x, y } = topCenter(workArea, OVERLAY_SPECS['control-bar'])
+    window.setPosition(x, y)
+
+    // Show without activating, so the meeting window keeps keyboard focus.
+    // Phase 1.2 replaces this with the stealth show (opacity 0 -> show -> opacity 1).
+    window.once('ready-to-show', () => window.showInactive())
+
+    window.on('closed', () => {
+      controlBar = null
     })
-
-    window.on('ready-to-show', () => window.show())
-
-    // Dev: load from the Vite dev server (hot reload). Prod: load the built file.
-    if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-      window.loadURL(process.env['ELECTRON_RENDERER_URL'])
-    } else {
-      window.loadFile(join(__dirname, '../renderer/index.html'))
-    }
-
+    controlBar = window
     return window
   }
 
-  return { openMainWindow, dispose: unsubscribe }
+  function openAnswerPanel(): BrowserWindow {
+    if (isAlive(answerPanel)) return answerPanel
+
+    // The panel is owned by the control bar: that keeps it out of Alt+Tab and the taskbar
+    // even though it's focusable, and keeps it above the bar's z-order (D-025).
+    const bar = openControlBar()
+    const window = createOverlayWindow('answer-panel', {
+      preventFocus: preventFocus(),
+      parent: bar
+    })
+
+    // Directly below the control bar, centred under it, kept inside the work area.
+    const { workArea } = screen.getDisplayMatching(bar.getBounds())
+    const { x, y } = below(bar.getBounds(), OVERLAY_SPECS['answer-panel'], workArea)
+    window.setPosition(x, y)
+
+    // Show without activating; it only takes focus when the user wants to type (Phase 2.5).
+    window.once('ready-to-show', () => window.showInactive())
+
+    window.on('closed', () => {
+      answerPanel = null
+    })
+    answerPanel = window
+    return window
+  }
+
+  function resizeAnswerPanel(contentHeight: number): void {
+    if (!isAlive(answerPanel)) return
+    const height = clampOverlayHeight('answer-panel', contentHeight)
+    const bounds = answerPanel.getBounds()
+    // Grow or shrink downwards: keep the top-left corner and width, change only the height.
+    if (bounds.height !== height) answerPanel.setBounds({ ...bounds, height })
+  }
+
+  function destroyOverlays(): void {
+    // Child (answer panel) first, then its owner (control bar).
+    if (isAlive(answerPanel)) answerPanel.destroy()
+    if (isAlive(controlBar)) controlBar.destroy()
+  }
+
+  return {
+    openControlBar,
+    openAnswerPanel,
+    resizeAnswerPanel,
+    destroyOverlays,
+    dispose: unsubscribe
+  }
 }

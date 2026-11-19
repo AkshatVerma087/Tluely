@@ -144,6 +144,9 @@ Accepted · 2026-11-19 · Pattern
 Accepted · 2026-11-19 · Pattern
 **Decision:** `createOverlayWindow(kind)` applies the shared overlay options: transparent, frameless, no shadow, always on top, `skipTaskbar`, `show: false`. Content protection is driven by state (D-022), and windows are shown with the opacity-0 trick.
 **Why:** Keeps stealth behaviour consistent across windows. Matches FINDINGS.md section 4.
+**Implementation (2026-11-19):** `main/windows/overlay-options.ts` holds the pure option builder and per-kind specs (control bar 200×50, never focusable; answer panel 540×140, focusable unless "don't take focus" is on). `main/windows/factory.ts` (`createOverlayWindow`) adds the secure webPreferences, sets the `'screen-saver'` always-on-top level and `setSkipTaskbar`, and loads the page with `?window=<kind>` (D-034). Additional flags: `thickFrame: false`, `movable: false` (moved by hotkeys), and transparent `backgroundColor`.
+**Alt+Tab (verified 2026-11-19):** On Windows, Electron's `skipTaskbar` only removes the taskbar button; it does NOT remove a window from Alt+Tab. Non-focusable overlays are excluded anyway (`focusable: false` → `WS_EX_NOACTIVATE`). Focusable overlays (answer panel) must be **owned windows** (`parent: controlBar`), which Windows also leaves out of Alt+Tab. `app/scripts/windows.ps1` reports `altTab=` for each window.
+**Quitting (found 2026-11-20):** `closable: false` makes Windows refuse `app.quit()`'s close step, which cancels the quit. The window service destroys the overlays on `before-quit` (`destroyOverlays()`). Any future `closable: false` window must be handled the same way.
 
 ## D-026: Audio processing in the renderer, network calls in main
 Accepted · 2026-11-19 · System design
@@ -188,6 +191,14 @@ Accepted · 2026-11-19 · Data
 - `LLMProvider.listModels()` doubles as the "test key" check. `streamAnswer` returns a `stopReason`, so "refused" (D-007) and "hit the length limit" can be shown to the user.
 
 **Why:** Plain data survives IPC and JSON unchanged, version fields make later format changes safe, and one shared definition stops main and the windows from disagreeing.
+
+## D-034: One renderer page; window kind chosen by `?window=` query
+Accepted · 2026-11-19 · Architecture
+**Decision:** Every window loads the same `renderer/index.html`. The factory adds `?window=<kind>` (`control-bar`, `answer-panel`, later `settings` and `audio-worker`), and the React entry reads it to render the matching component.
+**Why:** One Vite entry, one CSP, and one place for security rules. A separate HTML page per window would add build config for no real gain at this size.
+**Alternatives:** Multiple Vite HTML entries (more config, though each page's bundle would be smaller); hash routing (`#/control-bar`), which works too, but the query is clearer and isn't changed by in-page links.
+**Implementation (2026-11-19):** The kinds are listed once in `shared/windows.ts` (`WINDOW_KINDS`, `isWindowKind`, `windowKindFromSearch`), used by main (`loadRenderer(window, kind: WindowKind)`) and the renderer. `renderer/src/routes.tsx` maps every kind to a `React.lazy` component (typed `Record<WindowKind, ...>`), so each window loads only its own chunk. Unknown kinds render an error instead of a fallback page.
+**Consequences:** `createOverlayWindow()` / `loadRenderer()` in `main/windows/factory.ts` set the query. The trusted-URL check accepts our page with any query. The audio-worker page may still need its own CSP (`'wasm-unsafe-eval'`); revisit in Phase 3.3.
 
 ## D-030: Tooling and releases
 Accepted · 2026-11-19 · Tooling

@@ -64,6 +64,8 @@ export interface IpcCommands {
   'audio:clip': { args: [clip: AudioClip]; result: void }
 
   // Windows and app
+  /** Answer panel reports its content height; main resizes the panel (clamped 140-500 px). */
+  'window:resizePanel': { args: [contentHeight: number]; result: void }
   'window:openSettings': { args: []; result: void }
   'app:quit': { args: []; result: void }
 }
@@ -114,6 +116,7 @@ const commandChannelMap = {
   'history:get': true,
   'history:delete': true,
   'audio:clip': true,
+  'window:resizePanel': true,
   'window:openSettings': true,
   'app:quit': true
 } as const satisfies Record<CommandChannel, true>
