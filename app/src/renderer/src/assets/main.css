@@ -1,0 +1,62 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  font-family: 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
+  font-size: 14px;
+  color: #e6e6e6;
+  background: #1b1b1f;
+  -webkit-font-smoothing: antialiased;
+}
+
+.app {
+  height: 100%;
+  display: grid;
+  place-items: center;
+}
+
+/* Temporary IPC self-check (Phase 0.4); removed with the Phase 1 UI. */
+.ipc-check {
+  display: grid;
+  gap: 12px;
+}
+
+.ipc-check ul {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.ipc-check .passed {
+  color: #6fd38a;
+}
+
+.ipc-check .failed {
+  color: #ff6b6b;
+}
+
+.ipc-check small {
+  color: #9a9aa2;
+}
+
+.ipc-check button {
+  justify-self: start;
+  padding: 6px 12px;
+  border: 1px solid #3a3a42;
+  border-radius: 6px;
+  background: #26262c;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}

@@ -1,0 +1,25 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>tluely</title>
+    <!--
+      Content-Security-Policy (D-011): only our own code and assets may load or run.
+      - default-src 'self': nothing from the internet. The renderer never calls APIs; main does.
+      - script-src 'self': no inline or injected <script>, no eval.
+      - style-src 'unsafe-inline': React inline styles. Styles can't execute code.
+      - img-src data:: inline images such as screenshot previews.
+      - object-src / base-uri / form-action 'none': no plugins, no base-URL hijack, no form posts.
+      Phase 3 adds 'wasm-unsafe-eval' to script-src for the Silero VAD model (WebAssembly).
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

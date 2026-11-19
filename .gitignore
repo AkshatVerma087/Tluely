@@ -1,0 +1,39 @@
+# ---- Dependencies ----
+node_modules/
+.pnpm-store/
+
+# ---- Build output (electron-vite / electron-builder) ----
+app/out/
+app/dist/
+app/release/
+*.tsbuildinfo
+
+# ---- Logs ----
+*.log
+npm-debug.log*
+logs/
+
+# ---- Env and secrets (never commit API keys) ----
+.env
+.env.*
+!.env.example
+
+# ---- Test / coverage ----
+coverage/
+
+# ---- OS / editor ----
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+
+# ---- Claude Code local settings ----
+.claude/settings.local.json
+
+# ---- Analysis: Cluely is proprietary, never commit its code or dumps (D-003) ----
+analysis/cluely-src/
+analysis/rea-main.json
+analysis/capture-test/
