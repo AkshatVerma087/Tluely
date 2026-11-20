@@ -10,6 +10,7 @@ import { app } from 'electron'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import { createStateStore } from './store'
 import { DEFAULT_SETTINGS, createInitialState } from './store/defaults'
+import { createStealthService } from './stealth'
 import { createWindowService } from './windows'
 import { handleCommands } from './ipc'
 import { applySecurityPolicies } from './security'
@@ -33,8 +34,10 @@ app.whenReady().then(() => {
     createInitialState(DEFAULT_SETTINGS, { groq: false, anthropic: false })
   )
 
-  // 2. Services. More are added here phase by phase (stealth, hotkeys, ai, session, ...).
-  const windows = createWindowService({ store })
+  // 2. Services. More are added here phase by phase (hotkeys, ai, session, ...).
+  //    Stealth comes first: the window service hands it every overlay it creates.
+  const stealth = createStealthService({ store })
+  const windows = createWindowService({ store, stealth })
 
   // 3. Commands the windows can call through window.tluely.invoke(...) (D-021).
   const disposeCommands = handleCommands({
@@ -65,6 +68,7 @@ app.whenReady().then(() => {
   app.on('will-quit', () => {
     disposeCommands()
     windows.dispose()
+    stealth.dispose()
   })
 })
 

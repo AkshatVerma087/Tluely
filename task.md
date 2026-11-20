@@ -57,7 +57,7 @@ All code paths (`src/...`) are inside `app/`, and npm commands run in `app/` (D-
   - Transparency: pixels outside the rounded shapes are identical to the baseline screenshot (bar corner, panel corner); pixels inside the shapes changed.
 
 ### 1.2 Stealth
-- [ ] `stealth/`: apply `setContentProtection(state.isInvisible || state.isCapturing)` on every state change
+- [x] `stealth/`: apply `setContentProtection(state.isInvisible || state.isCapturing)` on every state change. Done: pure `stealth/protection.ts#shouldProtect` (`invisible || capturing`); `createStealthService({ store })` with `protect(window)`, called by the window service on each overlay before its first show; re-evaluated on every state change, Win32 call only when the value flips; closed windows forgotten. Verified 2026-11-20: `npm run check` passes (62 tests, 11 new in `stealth.test.ts`). In the built app, `windows.ps1` shows both overlays `affinity=WDA_EXCLUDEFROMCAPTURE` at startup (invisible by default). After a simulated click on the eye toggle they show `WDA_NONE`, and after a second click `WDA_EXCLUDEFROMCAPTURE` again. Quit via ✕ left 0 processes
 - [ ] Opacity-0 → show → opacity-1 after 30 ms show trick
 - [ ] Optional "don't take focus" setting (`focusable: false`, re-apply `skipTaskbar`)
 - [x] Copy `analysis/scripts/affinity.ps1` → `app/scripts/windows.ps1` targeting tluely (also reports work area, centre offset, topmost and toolwindow flags). Done 2026-11-19 during 1.1

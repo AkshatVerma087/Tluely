@@ -24,7 +24,7 @@ export function ControlBar(): React.JSX.Element {
         {status.label}
       </span>
 
-      {/* Invisible = hidden from screen share. Takes effect once stealth exists (Phase 1.2). */}
+      {/* Invisible = hidden from screen share. Main's stealth service applies it to every overlay. */}
       <button
         className={`icon-button ${invisible ? 'active' : ''}`}
         title={

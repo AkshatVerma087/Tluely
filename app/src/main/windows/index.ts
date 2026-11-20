@@ -3,10 +3,13 @@
 // - Overlay windows (control bar, answer panel) come from the shared factory (D-025).
 // - The answer panel is owned by the control bar (parent), which keeps it out of Alt+Tab.
 // - Every state change is pushed to all windows as 'state:changed' (D-022).
+// - Every overlay is handed to the stealth service right after creation, before it is shown, so
+//   content protection is in place from its first frame (D-025).
 // - The Settings window (a normal window) is added in Phase 1.4.
 
 import { BrowserWindow, screen } from 'electron'
 import type { StateStore } from '../store'
+import type { StealthService } from '../stealth'
 import { broadcast } from '../ipc'
 import { createOverlayWindow } from './factory'
 import { OVERLAY_SPECS, clampOverlayHeight } from './overlay-options'
@@ -14,6 +17,8 @@ import { below, topCenter } from './layout'
 
 export interface WindowServiceDeps {
   store: StateStore
+  /** Keeps content protection on the overlays in sync with the state. */
+  stealth: StealthService
 }
 
 export interface WindowService {
@@ -38,7 +43,7 @@ function isAlive(window: BrowserWindow | null): window is BrowserWindow {
   return window !== null && !window.isDestroyed()
 }
 
-export function createWindowService({ store }: WindowServiceDeps): WindowService {
+export function createWindowService({ store, stealth }: WindowServiceDeps): WindowService {
   // Push every state change to all windows as 'state:changed' (D-022).
   const unsubscribe = store.subscribe((next) => broadcast('state:changed', next))
 
@@ -57,6 +62,8 @@ export function createWindowService({ store }: WindowServiceDeps): WindowService
     if (isAlive(controlBar)) return controlBar
 
     const window = createOverlayWindow('control-bar', { preventFocus: preventFocus() })
+    // Content protection before the first show, so the bar is never captured (FINDINGS.md 3).
+    stealth.protect(window)
 
     // Top centre of the primary screen's work area (the screen minus the taskbar).
     const { workArea } = screen.getPrimaryDisplay()
@@ -84,6 +91,7 @@ export function createWindowService({ store }: WindowServiceDeps): WindowService
       preventFocus: preventFocus(),
       parent: bar
     })
+    stealth.protect(window)
 
     // Directly below the control bar, centred under it, kept inside the work area.
     const { workArea } = screen.getDisplayMatching(bar.getBounds())
