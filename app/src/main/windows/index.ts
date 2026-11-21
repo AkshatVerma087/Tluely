@@ -70,9 +70,9 @@ export function createWindowService({ store, stealth }: WindowServiceDeps): Wind
     const { x, y } = topCenter(workArea, OVERLAY_SPECS['control-bar'])
     window.setPosition(x, y)
 
-    // Show without activating, so the meeting window keeps keyboard focus.
-    // Phase 1.2 replaces this with the stealth show (opacity 0 -> show -> opacity 1).
-    window.once('ready-to-show', () => window.showInactive())
+    // Once the page has painted, show it with the stealth trick (opacity 0 -> show -> opacity 1),
+    // without activating, so the meeting window keeps keyboard focus.
+    window.once('ready-to-show', () => stealth.show(window))
 
     window.on('closed', () => {
       controlBar = null
@@ -98,8 +98,8 @@ export function createWindowService({ store, stealth }: WindowServiceDeps): Wind
     const { x, y } = below(bar.getBounds(), OVERLAY_SPECS['answer-panel'], workArea)
     window.setPosition(x, y)
 
-    // Show without activating; it only takes focus when the user wants to type (Phase 2.5).
-    window.once('ready-to-show', () => window.showInactive())
+    // Stealth show without activating; it only takes focus when the user wants to type (Phase 2.5).
+    window.once('ready-to-show', () => stealth.show(window))
 
     window.on('closed', () => {
       answerPanel = null

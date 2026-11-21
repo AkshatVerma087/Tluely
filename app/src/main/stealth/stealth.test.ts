@@ -2,10 +2,10 @@
 // They run in plain Node: windows are fake objects that record setContentProtection calls,
 // and the store is the real one from store/state.ts.
 
-import { describe, expect, it, vi, type Mock } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { createStateStore } from '../store'
 import { DEFAULT_SETTINGS, createInitialState } from '../store/defaults'
-import { createStealthService, shouldProtect, type ProtectableWindow } from '.'
+import { SHOW_REVEAL_DELAY_MS, createStealthService, shouldProtect, type StealthWindow } from '.'
 
 /** A store starting with the given invisible/capturing flags. */
 function makeStore(invisible: boolean, capturing = false): ReturnType<typeof createStateStore> {
@@ -14,18 +14,22 @@ function makeStore(invisible: boolean, capturing = false): ReturnType<typeof cre
 }
 
 /**
- * A fake window. `setContentProtection` is a spy, so tests can check the calls.
+ * A fake window. Its methods are spies, so tests can check the calls (and their order).
  * `close()` simulates the user/app closing it: it becomes destroyed and fires 'closed'.
  */
-function makeWindow(): ProtectableWindow & {
+function makeWindow(): StealthWindow & {
   setContentProtection: Mock<(enable: boolean) => void>
+  setOpacity: Mock<(opacity: number) => void>
+  showInactive: Mock<() => void>
   close(): void
 } {
   let destroyed = false
   let onClosed: (() => void) | null = null
   return {
-    // Typed spy, so it matches ProtectableWindow's (enable: boolean) => void signature.
+    // Typed spies, so they match the StealthWindow method signatures.
     setContentProtection: vi.fn<(enable: boolean) => void>(),
+    setOpacity: vi.fn<(opacity: number) => void>(),
+    showInactive: vi.fn<() => void>(),
     isDestroyed: () => destroyed,
     once: (_event, listener) => {
       onClosed = listener
@@ -142,5 +146,92 @@ describe('createStealthService', () => {
     store.update((s) => ({ ...s, invisible: false }))
 
     expect(window.setContentProtection).not.toHaveBeenCalled()
+  })
+})
+
+// The opacity-0 show trick (FINDINGS.md section 4). Fake timers let the tests step through the
+// 30 ms delay without really waiting: vi.advanceTimersByTime(ms) runs timers due in that time.
+describe('stealth show', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  // The core sequence: protection first, then opacity 0, then showInactive, and opacity 1
+  // only once the delay has passed.
+  it('shows at opacity 0 and reveals after the delay', () => {
+    const stealth = createStealthService({ store: makeStore(true) })
+    const window = makeWindow()
+
+    stealth.show(window)
+
+    // invocationCallOrder is a global counter of spy calls, so it proves the order of the calls.
+    const [protectedAt] = window.setContentProtection.mock.invocationCallOrder
+    const [hiddenAt] = window.setOpacity.mock.invocationCallOrder
+    const [shownAt] = window.showInactive.mock.invocationCallOrder
+    expect(window.setContentProtection).toHaveBeenCalledWith(true)
+    expect(window.setOpacity).toHaveBeenCalledExactlyOnceWith(0)
+    expect(protectedAt).toBeLessThan(hiddenAt)
+    expect(hiddenAt).toBeLessThan(shownAt)
+
+    // Just before the delay ends: still transparent.
+    vi.advanceTimersByTime(SHOW_REVEAL_DELAY_MS - 1)
+    expect(window.setOpacity).toHaveBeenCalledTimes(1)
+
+    // Delay reached: revealed.
+    vi.advanceTimersByTime(1)
+    expect(window.setOpacity).toHaveBeenLastCalledWith(1)
+  })
+
+  // Showing twice in a row restarts the timer, so the window is revealed exactly once.
+  it('restarts the reveal when shown again before it fired', () => {
+    const stealth = createStealthService({ store: makeStore(true) })
+    const window = makeWindow()
+
+    stealth.show(window)
+    vi.advanceTimersByTime(SHOW_REVEAL_DELAY_MS - 10)
+    stealth.show(window)
+    vi.advanceTimersByTime(SHOW_REVEAL_DELAY_MS)
+
+    const reveals = window.setOpacity.mock.calls.filter(([opacity]) => opacity === 1)
+    expect(reveals).toHaveLength(1)
+  })
+
+  // Closing the window during the 30 ms must not lead to setOpacity on a destroyed window
+  // (Electron would throw "Object has been destroyed").
+  it('does not reveal a window that was closed during the delay', () => {
+    const stealth = createStealthService({ store: makeStore(true) })
+    const window = makeWindow()
+
+    stealth.show(window)
+    window.close()
+    vi.advanceTimersByTime(SHOW_REVEAL_DELAY_MS)
+
+    expect(window.setOpacity).not.toHaveBeenCalledWith(1)
+  })
+
+  // A destroyed window is ignored completely.
+  it('ignores a destroyed window', () => {
+    const stealth = createStealthService({ store: makeStore(true) })
+    const window = makeWindow()
+    window.close()
+
+    stealth.show(window)
+
+    expect(window.showInactive).not.toHaveBeenCalled()
+  })
+
+  // dispose() cancels reveals that are still pending.
+  it('cancels pending reveals on dispose', () => {
+    const stealth = createStealthService({ store: makeStore(true) })
+    const window = makeWindow()
+
+    stealth.show(window)
+    stealth.dispose()
+    vi.advanceTimersByTime(SHOW_REVEAL_DELAY_MS)
+
+    expect(window.setOpacity).not.toHaveBeenCalledWith(1)
   })
 })
